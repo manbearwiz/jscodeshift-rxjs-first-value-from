@@ -42,6 +42,18 @@ const user = firstValueFrom(getUser());
     );
   });
 
+  it('transforms toPromise() without take(1) or first() to lastValueFrom()', () => {
+    transformTest(
+      `
+const user = getUser().toPromise();
+`,
+      `
+import { lastValueFrom } from "rxjs";
+const user = lastValueFrom(getUser());
+      `,
+    );
+  });
+
   it('transforms toPromise() with multiple operators', () => {
     transformTest(
       `
@@ -76,7 +88,7 @@ const user$ = getUser().pipe(tap(console.log), take(1));
     );
   });
 
-  it('does not transform if take is not 1', () => {
+  it('transforms toPromise() with take(!=1) to lastValueFrom()', () => {
     transformTest(
       `
 import { take } from "rxjs/operators";
@@ -84,9 +96,10 @@ import { take } from "rxjs/operators";
 const user = getUser().pipe(take(2)).toPromise();
 `,
       `
+import { lastValueFrom } from "rxjs";
 import { take } from "rxjs/operators";
 
-const user = getUser().pipe(take(2)).toPromise();
+const user = lastValueFrom(getUser().pipe(take(2)));
       `,
     );
   });
@@ -138,13 +151,14 @@ getInternal = async (path: string): Promise<string> =>
     );
   });
 
-  it('does not transform if no pipe() exists', () => {
+  it('transforms simple toPromise() without pipe', () => {
     transformTest(
       `
 const user = getUser().toPromise();
 `,
       `
-const user = getUser().toPromise();
+import { lastValueFrom } from "rxjs";
+const user = lastValueFrom(getUser());
       `,
     );
   });
@@ -160,7 +174,7 @@ const user = getUser();
     );
   });
 
-  it('does not transform if no take(1) but has other operators', () => {
+  it('uses lastValueFrom if take(1) is not in the pipe', () => {
     transformTest(
       `
 import { map } from "rxjs/operators";
@@ -168,9 +182,44 @@ import { map } from "rxjs/operators";
 const user = getUser().pipe(map((user) => user.name)).toPromise();
 `,
       `
+import { lastValueFrom } from "rxjs";
 import { map } from "rxjs/operators";
 
-const user = getUser().pipe(map((user) => user.name)).toPromise();
+const user = lastValueFrom(getUser().pipe(map((user) => user.name)));
+      `,
+    );
+  });
+
+  it('adds import for firstValueFrom to existing rxjs import statement if it exists', () => {
+    transformTest(
+      `
+import { Observable } from "rxjs";
+import { take } from "rxjs/operators";
+
+const user = getUser().pipe(take(1)).toPromise();
+`,
+      `
+import { Observable, firstValueFrom } from "rxjs";
+
+const user = firstValueFrom(getUser());
+      `,
+    );
+  });
+
+  it('add the import in the correct order', () => {
+    transformTest(
+      `
+import { foo } from "bar";
+import { take, map } from "rxjs/operators";
+
+const name = getUser().pipe(take(1), map((user) => user.name)).toPromise();
+`,
+      `
+import { foo } from "bar";
+import { firstValueFrom } from "rxjs";
+import { map } from "rxjs/operators";
+
+const name = firstValueFrom(getUser().pipe(map((user) => user.name)));
       `,
     );
   });
