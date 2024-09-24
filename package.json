@@ -12,12 +12,16 @@
     "type": "git",
     "url": "https://github.com/manbearwiz/jscodeshift-rxjs-first-value-from.git"
   },
-  "keywords": ["jscodeshift", "typescript", "ts", "satisfies", "codemod"],
+  "keywords": ["jscodeshift", "rxjs", "firstValueFrom", "lastValueFrom"],
   "scripts": {
-    "test": "vitest --run --coverage",
-    "test:watch": "vitest --ui --watch",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch --coverage --ui",
     "build": "tsc",
-    "semantic-release": "semantic-release"
+    "prepublish": "npm run build",
+    "semantic-release": "semantic-release",
+    "lint": "npx @biomejs/biome check",
+    "lint:fix": "npx @biomejs/biome check --write"
   },
   "dependencies": {
     "jscodeshift": "^17.0.0"
@@ -37,7 +41,7 @@
     "semantic-release": "^21.1.0",
     "typescript": "^5.1.6",
     "vitest": "^2.0.5",
-    "vitest-tiny-reporter": "^1.0.4"
+    "vitest-tiny-reporter": "^1.0.5"
   },
   "overrides": {
     "ast-types": "^0.16.1"

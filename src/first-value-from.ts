@@ -13,19 +13,16 @@ export default function transform(
 ): string | undefined {
   const j = api.jscodeshift;
   const root = j(file.source);
-  let firstValueFromAdded = false;
+  const importsAdded = new Set<string>();
 
   root
-    .find(j.CallExpression, {
-      callee: { property: { name: 'toPromise' } },
-    })
+    .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
     .forEach((path: ASTPath<CallExpression>) => {
       const toPromiseCall = path.value.callee;
 
       if (
         j.MemberExpression.check(toPromiseCall) &&
-        j.CallExpression.check(toPromiseCall.object) &&
-        j.MemberExpression.check(toPromiseCall.object.callee)
+        j.CallExpression.check(toPromiseCall.object)
       ) {
         const pipeCall = toPromiseCall.object;
         const takeCall = pipeCall.arguments.find(
@@ -38,65 +35,93 @@ export default function transform(
               arg.callee.name === 'first'),
         );
 
-        if (!takeCall) return;
+        if (takeCall) {
+          pipeCall.arguments = pipeCall.arguments.filter(
+            (arg) => arg !== takeCall,
+          );
+        }
 
-        pipeCall.arguments = pipeCall.arguments.filter(
-          (arg) => arg !== takeCall,
-        );
-
-        const firstValueFromCall = j.callExpression(
-          j.identifier('firstValueFrom'),
-          [
+        const promiseFn = takeCall ? 'firstValueFrom' : 'lastValueFrom';
+        importsAdded.add(promiseFn);
+        j(path).replaceWith(
+          j.callExpression(j.identifier(promiseFn), [
             pipeCall.arguments.length
               ? pipeCall
-              : toPromiseCall.object.callee.object,
-          ],
+              : j.MemberExpression.check(toPromiseCall.object.callee)
+                ? toPromiseCall.object.callee.object
+                : toPromiseCall.object,
+          ]),
         );
-
-        firstValueFromAdded = true;
-        j(path).replaceWith(firstValueFromCall);
       }
     });
 
-  if (firstValueFromAdded) {
-    root
-      .get()
-      .node.program.body.unshift(
-        j.importDeclaration(
-          [j.importSpecifier(j.identifier('firstValueFrom'))],
-          j.literal('rxjs'),
-        ),
-      );
-  }
+  importsAdded.forEach((importName) => {
+    const rxjsImport = root.find(j.ImportDeclaration, {
+      source: { value: 'rxjs' },
+    });
 
-  for (const operator of ['first', 'take']) {
+    if (rxjsImport.length) {
+      const importDeclaration = rxjsImport.get().value;
+
+      if (
+        j.ImportDeclaration.check(importDeclaration) &&
+        importDeclaration.specifiers
+      ) {
+        if (
+          !importDeclaration.specifiers?.some(
+            (specifier) =>
+              j.ImportSpecifier.check(specifier) &&
+              j.Identifier.check(specifier.imported) &&
+              specifier.imported.name === importName,
+          )
+        ) {
+          importDeclaration.specifiers.push(
+            j.importSpecifier(j.identifier(importName)),
+          );
+        }
+      }
+    } else {
+      const newImport = j.importDeclaration(
+        [j.importSpecifier(j.identifier(importName))],
+        j.literal('rxjs'),
+      );
+
+      const rxjsOperatorsImport = root.find(j.ImportDeclaration, {
+        source: { value: 'rxjs/operators' },
+      });
+
+      if (rxjsOperatorsImport.length) {
+        rxjsOperatorsImport.insertBefore(newImport);
+      } else {
+        root.get().node.program.body.unshift(newImport);
+      }
+    }
+  });
+
+  ['first', 'take'].forEach((operator) => {
     root
       .find(j.ImportDeclaration, { source: { value: 'rxjs/operators' } })
       .forEach((importPath) => {
         const importDeclaration = importPath.value;
 
         if (
-          root.find(j.CallExpression, {
-            callee: { name: operator },
-          }).length
+          !root.find(j.CallExpression, { callee: { name: operator } }).length
         ) {
-          return;
-        }
+          const remainingSpecifiers = importDeclaration.specifiers?.filter(
+            (specifier) =>
+              j.ImportSpecifier.check(specifier) &&
+              j.Identifier.check(specifier.imported) &&
+              specifier.imported.name !== operator,
+          );
 
-        const remainingSpecifiers = importDeclaration.specifiers?.filter(
-          (specifier) =>
-            j.ImportSpecifier.check(specifier) &&
-            j.Identifier.check(specifier.imported) &&
-            specifier.imported.name !== operator,
-        );
-
-        if (remainingSpecifiers?.length) {
-          importDeclaration.specifiers = remainingSpecifiers;
-        } else {
-          j(importPath).remove();
+          if (remainingSpecifiers?.length) {
+            importDeclaration.specifiers = remainingSpecifiers;
+          } else {
+            j(importPath).remove();
+          }
         }
       });
-  }
+  });
 
   return root.toSource();
 }
