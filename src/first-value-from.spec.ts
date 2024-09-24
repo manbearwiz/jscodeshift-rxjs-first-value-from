@@ -223,4 +223,16 @@ const name = firstValueFrom(getUser().pipe(map((user) => user.name)));
       `,
     );
   });
+
+  it('can handle chained methods', () => {
+    transformTest(
+      `
+const results = await this.service.open().after().toPromise<Foo | null>();
+`,
+      `
+import { lastValueFrom } from "rxjs";
+const results = await lastValueFrom(this.service.open().after());
+      `,
+    );
+  });
 });
