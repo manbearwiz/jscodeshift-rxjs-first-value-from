@@ -47,6 +47,7 @@ export default function transform(
         j.callExpression(j.identifier(promiseFn), [
           j.CallExpression.check(caller) &&
           j.MemberExpression.check(caller.callee) &&
+          takeCall &&
           !caller.arguments.length
             ? caller.callee.object
             : caller,
