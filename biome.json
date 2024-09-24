@@ -16,7 +16,10 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "complexity": { "noExcessiveCognitiveComplexity": "error" }
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "error",
+        "noForEach": "off"
+      }
     }
   },
   "javascript": { "formatter": { "quoteStyle": "single" } }
