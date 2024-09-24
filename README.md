@@ -21,7 +21,7 @@ npm install -g jscodeshift jscodeshift-rxjs-first-value-from
 To apply the codemod to all TypeScript files in the `src` directory, you can use the following command:
 
 ```sh
-jscodeshift -t node_modules/jscodeshift-rxjs-first-value-from/src/ts-satisfies.ts src/**/*.ts
+jscodeshift -t node_modules/jscodeshift-rxjs-first-value-from/src/first-value-from.ts src/**/*.ts
 ```
 
 ### Options
