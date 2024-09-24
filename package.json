@@ -10,7 +10,7 @@
   "homepage": "https://github.com/manbearwiz/jscodeshift-rxjs-first-value-from#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/manbearwiz/jscodeshift-rxjs-first-value-from.git"
+    "url": "git+https://github.com/manbearwiz/jscodeshift-rxjs-first-value-from.git"
   },
   "keywords": ["jscodeshift", "rxjs", "firstValueFrom", "lastValueFrom"],
   "scripts": {

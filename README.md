@@ -14,6 +14,8 @@ This codemod automates the migration from RxJS’s deprecated `.toPromise()` met
     - [Options](#options)
     - [Examples](#examples)
       - [`toPromise` to `firstValueFrom`](#topromise-to-firstvaluefrom)
+      - [`toPromise` to `lastValueFrom`](#topromise-to-lastvaluefrom)
+      - [`toPromise` with type argument](#topromise-with-type-argument)
   - [Running Unit Tests](#running-unit-tests)
   - [Contributing](#contributing)
   - [License](#license)
@@ -67,6 +69,48 @@ import { firstValueFrom } from "rxjs";
 import { map } from "rxjs/operators";
 
 const name = firstValueFrom(getUser().pipe(map((user) => user.name)));
+```
+
+#### `toPromise` to `lastValueFrom`
+
+When calling `toPromise` on a pipe without `take(1)` or `first()` the codemod will replace it with `lastValueFrom`.
+
+Before:
+
+```ts
+import { map } from "rxjs/operators";
+
+const name = getUser().pipe(map((user) => user.name)).toPromise();
+```
+
+After running the codemod:
+
+```ts
+import { lastValueFrom } from "rxjs";
+import { map } from "rxjs/operators";
+
+const name = lastValueFrom(getUser().pipe(map((user) => user.name)));
+```
+
+#### `toPromise` with type argument
+
+When calling `toPromise` with a type argument, the codemod will cast the observable to the specified type.
+
+Before:
+
+```ts
+import { map } from "rxjs/operators";
+
+const name = getUser().pipe(map((user) => user.name)).toPromise<string>();
+```
+
+After running the codemod:
+
+```ts
+import { lastValueFrom } from "rxjs";
+import { map } from "rxjs/operators";
+
+const name = lastValueFrom(getUser().pipe(map((user) => user.name)) as Observable<string>);
 ```
 
 ## Running Unit Tests
