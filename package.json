@@ -27,7 +27,7 @@
     "@commitlint/cli": "^19.0.3",
     "@commitlint/config-angular": "^19.0.3",
     "@tsconfig/recommended": "^1.0.2",
-    "@tsconfig/strictest": "^2.0.1",
+    "@tsconfig/strictest": "^2.0.5",
     "@types/jscodeshift": "^0.11.11",
     "@types/node": "^20.14.2",
     "@vitest/coverage-v8": "^2.0.5",
