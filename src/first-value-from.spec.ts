@@ -257,4 +257,21 @@ const user = getUser().pipe(take(1)).toPromise<User>();
       const user = firstValueFrom(getUser() as Observable<User>);"
     `);
   });
+
+  it('should handle type arguments passed to toPromise with multiple pipe operators and string literal type', () => {
+    expect(
+      t(
+        `
+import { map, first } from "rxjs/operators";
+
+const name = getUser().pipe(map(u => u.name), first()).toPromise<"foo" | "bar">();
+      `,
+      ),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom, Observable } from "rxjs";
+      import { map } from "rxjs/operators";
+
+      const name = firstValueFrom(getUser().pipe(map(u => u.name)) as Observable<"foo" | "bar">);"
+    `);
+  });
 });
