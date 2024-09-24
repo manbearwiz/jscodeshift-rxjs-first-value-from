@@ -5,6 +5,7 @@ import type {
   FileInfo,
   MemberExpression,
   Options,
+  TSHasOptionalTypeParameterInstantiation,
 } from 'jscodeshift';
 
 export default function transform(
@@ -20,6 +21,9 @@ export default function transform(
     .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
     .forEach((path: ASTPath<CallExpression>) => {
       const toPromiseFn = path.value.callee as MemberExpression;
+      const typeParams =
+        j.CallExpression.check(path.value) &&
+        (path.value as TSHasOptionalTypeParameterInstantiation).typeParameters;
       const caller = toPromiseFn.object;
       const takeCall =
         j.CallExpression.check(caller) &&
@@ -43,14 +47,26 @@ export default function transform(
       }
 
       importsAdded.add(promiseFn);
+      const observableExpression =
+        j.CallExpression.check(caller) &&
+        j.MemberExpression.check(caller.callee) &&
+        takeCall &&
+        !caller.arguments.length
+          ? caller.callee.object
+          : caller;
+
+      if (typeParams) {
+        importsAdded.add('Observable');
+      }
+
       j(path).replaceWith(
         j.callExpression(j.identifier(promiseFn), [
-          j.CallExpression.check(caller) &&
-          j.MemberExpression.check(caller.callee) &&
-          takeCall &&
-          !caller.arguments.length
-            ? caller.callee.object
-            : caller,
+          typeParams
+            ? j.tsAsExpression(
+                observableExpression,
+                j.tsTypeReference(j.identifier('Observable'), typeParams),
+              )
+            : observableExpression,
         ]),
       );
     });

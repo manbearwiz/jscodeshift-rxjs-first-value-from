@@ -100,7 +100,7 @@ const user = getUser().pipe(take(2)).toPromise();
       const user = lastValueFrom(getUser().pipe(take(2)));"`);
   });
 
-  it('handles multiple multipe promises', () => {
+  it('handles multiple multiple promises', () => {
     expect(
       t(
         `
@@ -218,8 +218,9 @@ const results = await this.service.open().after().toPromise<Foo | null>();
       `,
       ),
     ).toMatchInlineSnapshot(`
-      "import { lastValueFrom } from "rxjs";
-      const results = await lastValueFrom(this.service.open().after());"`);
+      "import { lastValueFrom, Observable } from "rxjs";
+      const results = await lastValueFrom(this.service.open().after() as Observable<Foo | null>);"
+    `);
   });
 
   it('can handle chained methods that are not pipe and have arguments', () => {
@@ -232,9 +233,28 @@ const results = await this.service.open(getArgs()).after(take(1), first()).toPro
       `,
       ),
     ).toMatchInlineSnapshot(`
-      "import { lastValueFrom } from "rxjs";
+      "import { lastValueFrom, Observable } from "rxjs";
       import { getArgs } from "./args";
 
-      const results = await lastValueFrom(this.service.open(getArgs()).after(take(1), first()));"`);
+      const results = await lastValueFrom(
+        this.service.open(getArgs()).after(take(1), first()) as Observable<Foo | null>
+      );"
+    `);
+  });
+
+  it('should handle type arguments passed to toPromise', () => {
+    expect(
+      t(
+        `
+import { take } from "rxjs/operators";
+
+const user = getUser().pipe(take(1)).toPromise<User>();
+      `,
+      ),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom, Observable } from "rxjs";
+
+      const user = firstValueFrom(getUser() as Observable<User>);"
+    `);
   });
 });
