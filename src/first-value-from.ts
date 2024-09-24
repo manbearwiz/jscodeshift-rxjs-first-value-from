@@ -3,6 +3,7 @@ import type {
   ASTPath,
   CallExpression,
   FileInfo,
+  MemberExpression,
   Options,
 } from 'jscodeshift';
 
@@ -18,14 +19,14 @@ export default function transform(
   root
     .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
     .forEach((path: ASTPath<CallExpression>) => {
-      const toPromiseFn = path.value.callee;
-
-      if (
-        j.MemberExpression.check(toPromiseFn) &&
-        j.CallExpression.check(toPromiseFn.object)
-      ) {
-        const caller = toPromiseFn.object;
-        const takeCall = caller.arguments.find(
+      const toPromiseFn = path.value.callee as MemberExpression;
+      const caller = toPromiseFn.object;
+      const takeCall =
+        j.CallExpression.check(caller) &&
+        j.MemberExpression.check(caller.callee) &&
+        j.Identifier.check(caller.callee.property) &&
+        caller.callee.property.name === 'pipe' &&
+        caller.arguments.find(
           (arg) =>
             j.CallExpression.check(arg) &&
             j.Identifier.check(arg.callee) &&
@@ -35,23 +36,22 @@ export default function transform(
               arg.callee.name === 'first'),
         );
 
-        if (takeCall) {
-          caller.arguments = caller.arguments.filter((arg) => arg !== takeCall);
-        }
-
-        const promiseFn = takeCall ? 'firstValueFrom' : 'lastValueFrom';
-        importsAdded.add(promiseFn);
-        j(path).replaceWith(
-          j.callExpression(j.identifier(promiseFn), [
-            j.MemberExpression.check(caller.callee) &&
-            j.Identifier.check(caller.callee.property) &&
-            caller.callee.property.name === 'pipe' &&
-            !caller.arguments.length
-              ? caller.callee.object
-              : caller,
-          ]),
-        );
+      let promiseFn = 'lastValueFrom';
+      if (takeCall) {
+        caller.arguments = caller.arguments.filter((arg) => arg !== takeCall);
+        promiseFn = 'firstValueFrom';
       }
+
+      importsAdded.add(promiseFn);
+      j(path).replaceWith(
+        j.callExpression(j.identifier(promiseFn), [
+          j.CallExpression.check(caller) &&
+          j.MemberExpression.check(caller.callee) &&
+          !caller.arguments.length
+            ? caller.callee.object
+            : caller,
+        ]),
+      );
     });
 
   importsAdded.forEach((importName) => {
