@@ -18,14 +18,14 @@ export default function transform(
   root
     .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
     .forEach((path: ASTPath<CallExpression>) => {
-      const toPromiseCall = path.value.callee;
+      const toPromiseFn = path.value.callee;
 
       if (
-        j.MemberExpression.check(toPromiseCall) &&
-        j.CallExpression.check(toPromiseCall.object)
+        j.MemberExpression.check(toPromiseFn) &&
+        j.CallExpression.check(toPromiseFn.object)
       ) {
-        const pipeCall = toPromiseCall.object;
-        const takeCall = pipeCall.arguments.find(
+        const caller = toPromiseFn.object;
+        const takeCall = caller.arguments.find(
           (arg) =>
             j.CallExpression.check(arg) &&
             j.Identifier.check(arg.callee) &&
@@ -36,20 +36,19 @@ export default function transform(
         );
 
         if (takeCall) {
-          pipeCall.arguments = pipeCall.arguments.filter(
-            (arg) => arg !== takeCall,
-          );
+          caller.arguments = caller.arguments.filter((arg) => arg !== takeCall);
         }
 
         const promiseFn = takeCall ? 'firstValueFrom' : 'lastValueFrom';
         importsAdded.add(promiseFn);
         j(path).replaceWith(
           j.callExpression(j.identifier(promiseFn), [
-            pipeCall.arguments.length
-              ? pipeCall
-              : j.MemberExpression.check(toPromiseCall.object.callee)
-                ? toPromiseCall.object.callee.object
-                : toPromiseCall.object,
+            j.MemberExpression.check(caller.callee) &&
+            j.Identifier.check(caller.callee.property) &&
+            caller.callee.property.name === 'pipe' &&
+            !caller.arguments.length
+              ? caller.callee.object
+              : caller,
           ]),
         );
       }
