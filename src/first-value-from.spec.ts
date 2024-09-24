@@ -18,7 +18,7 @@ describe('first-value-from transformation', () => {
 import { take } from "rxjs/operators";
 
 const user = getUser().pipe(take(1)).toPromise();
-`,
+      `,
       `
 import { firstValueFrom } from "rxjs";
 
@@ -33,7 +33,7 @@ const user = firstValueFrom(getUser());
 import { first } from "rxjs/operators";
 
 const user = getUser().pipe(first()).toPromise();
-`,
+      `,
       `
 import { firstValueFrom } from "rxjs";
 
@@ -46,38 +46,40 @@ const user = firstValueFrom(getUser());
     transformTest(
       `
 const user = getUser().toPromise();
-`,
+const org = org$.toPromise();
+      `,
       `
 import { lastValueFrom } from "rxjs";
 const user = lastValueFrom(getUser());
+const org = lastValueFrom(org$);
       `,
     );
   });
 
-  it('transforms toPromise() with multiple operators', () => {
+  it('retains other pipe arguments when transforming', () => {
     transformTest(
       `
 import { take, map } from "rxjs/operators";
 
-const user = getUser().pipe(map((user) => user.name), take(1)).toPromise();
-`,
+const name = getUser().pipe(map((user) => user.name), take(1)).toPromise();
+      `,
       `
 import { firstValueFrom } from "rxjs";
 import { map } from "rxjs/operators";
 
-const user = firstValueFrom(getUser().pipe(map((user) => user.name)));
+const name = firstValueFrom(getUser().pipe(map((user) => user.name)));
       `,
     );
   });
 
-  it('does not remove take import if it is used elsewhere', () => {
+  it('does not remove imports if used elsewhere', () => {
     transformTest(
       `
 import { take, tap, map } from "rxjs/operators";
 
 const name = getUser().pipe(map((user) => user.name), take(1)).toPromise();
 const user$ = getUser().pipe(tap(console.log), take(1));
-`,
+      `,
       `
 import { firstValueFrom } from "rxjs";
 import { take, tap, map } from "rxjs/operators";
@@ -94,7 +96,7 @@ const user$ = getUser().pipe(tap(console.log), take(1));
 import { take } from "rxjs/operators";
 
 const user = getUser().pipe(take(2)).toPromise();
-`,
+      `,
       `
 import { lastValueFrom } from "rxjs";
 import { take } from "rxjs/operators";
@@ -104,70 +106,61 @@ const user = lastValueFrom(getUser().pipe(take(2)));
     );
   });
 
-  it('handles multiple awaits with take(1)', () => {
+  it('handles multiple multipe promises', () => {
     transformTest(
       `
 import { take } from "rxjs/operators";
 
-async function initializeFeatureFlags() {
-  const [user, { slug }] = await Promise.all([
-    getLoggedInUser().pipe(take(1)).toPromise(),
-    getTenant().pipe(filterNull(), take(1)).toPromise(),
+async function initialize() {
+  const [user, org] = await Promise.all([
+    getUser().pipe(take(1)).toPromise(),
+    getOrg().pipe(filterNull(), take(1)).toPromise(),
   ]);
 
   return user;
-}`,
+}
+      `,
       `
 import { firstValueFrom } from "rxjs";
 
-async function initializeFeatureFlags() {
-  const [user, { slug }] = await Promise.all([
-    firstValueFrom(getLoggedInUser()),
-    firstValueFrom(getTenant().pipe(filterNull())),
+async function initialize() {
+  const [user, org] = await Promise.all([
+    firstValueFrom(getUser()),
+    firstValueFrom(getOrg().pipe(filterNull())),
   ]);
 
   return user;
-}`,
+}
+    `,
     );
   });
 
-  it('handles async arrow function transformation', () => {
+  it('transforms toPromise() with take(1) and async function', () => {
     transformTest(
       `
 import { take } from "rxjs/operators";
 
-getInternal = async (path: string): Promise<string> =>
-  this.prependSlugPipe
+transform = async (path: string): Promise<string> =>
+  this.service
     .transform(path)
     .pipe(take(1))
-    .toPromise();`,
+    .toPromise();
+      `,
       `
 import { firstValueFrom } from "rxjs";
 
-getInternal = async (path: string): Promise<string> =>
-  firstValueFrom(this.prependSlugPipe
+transform = async (path: string): Promise<string> =>
+  firstValueFrom(this.service
     .transform(path));
-  `,
-    );
-  });
-
-  it('transforms simple toPromise() without pipe', () => {
-    transformTest(
-      `
-const user = getUser().toPromise();
-`,
-      `
-import { lastValueFrom } from "rxjs";
-const user = lastValueFrom(getUser());
       `,
     );
   });
 
-  it('does not transform if no take(1) or toPromise()', () => {
+  it('does not transform if toPromise() is not called', () => {
     transformTest(
       `
 const user = getUser();
-`,
+      `,
       `
 const user = getUser();
       `,
@@ -179,13 +172,13 @@ const user = getUser();
       `
 import { map } from "rxjs/operators";
 
-const user = getUser().pipe(map((user) => user.name)).toPromise();
-`,
+const name = getUser().pipe(map((user) => user.name)).toPromise();
+      `,
       `
 import { lastValueFrom } from "rxjs";
 import { map } from "rxjs/operators";
 
-const user = lastValueFrom(getUser().pipe(map((user) => user.name)));
+const name = lastValueFrom(getUser().pipe(map((user) => user.name)));
       `,
     );
   });
@@ -197,7 +190,7 @@ import { Observable } from "rxjs";
 import { take } from "rxjs/operators";
 
 const user = getUser().pipe(take(1)).toPromise();
-`,
+      `,
       `
 import { Observable, firstValueFrom } from "rxjs";
 
@@ -213,7 +206,7 @@ import { foo } from "bar";
 import { take, map } from "rxjs/operators";
 
 const name = getUser().pipe(take(1), map((user) => user.name)).toPromise();
-`,
+      `,
       `
 import { foo } from "bar";
 import { firstValueFrom } from "rxjs";
@@ -224,14 +217,18 @@ const name = firstValueFrom(getUser().pipe(map((user) => user.name)));
     );
   });
 
-  it('can handle chained methods', () => {
+  it('can handle chained methods that are not pipe', () => {
     transformTest(
       `
-const results = await this.service.open().after().toPromise<Foo | null>();
-`,
+import { getArgs } from "./args";
+
+const results = await this.service.open(getArgs()).after(first()).toPromise<Foo | null>();
+      `,
       `
 import { lastValueFrom } from "rxjs";
-const results = await lastValueFrom(this.service.open().after());
+import { getArgs } from "./args";
+
+const results = await lastValueFrom(this.service.open(getArgs()).after(first()));
       `,
     );
   });
