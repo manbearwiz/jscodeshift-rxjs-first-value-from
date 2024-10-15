@@ -17,47 +17,54 @@ export default function transform(
   const root = j(file.source);
   const importsAdded = new Set<string>();
 
-  root
-    .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
-    .forEach((path: ASTPath<CallExpression>) => {
-      const toPromiseFn = path.value.callee as MemberExpression;
-      const typeParams =
-        j.CallExpression.check(path.value) &&
-        (path.value as TSHasOptionalTypeParameterInstantiation).typeParameters;
-      const caller = toPromiseFn.object;
-      const takeCall =
-        j.CallExpression.check(caller) &&
-        j.MemberExpression.check(caller.callee) &&
-        j.Identifier.check(caller.callee.property) &&
-        caller.callee.property.name === 'pipe' &&
-        caller.arguments.find(
-          (arg) =>
-            j.CallExpression.check(arg) &&
-            j.Identifier.check(arg.callee) &&
-            ((arg.callee.name === 'take' &&
-              j.NumericLiteral.check(arg.arguments[0]) &&
-              arg.arguments[0].value === 1) ||
-              arg.callee.name === 'first'),
-        );
+  const replaceWithFirstValueFrom = (path: ASTPath<CallExpression>) => {
+    const replacedFn = path.value.callee as MemberExpression;
 
-      let promiseFn = 'lastValueFrom';
-      if (takeCall) {
-        caller.arguments = caller.arguments.filter((arg) => arg !== takeCall);
-        promiseFn = 'firstValueFrom';
-      }
+    if (
+      !j.CallExpression.check(path.value) ||
+      !j.Identifier.check(replacedFn.property)
+    ) {
+      return;
+    }
 
+    const typeParams = (path.value as TSHasOptionalTypeParameterInstantiation)
+      .typeParameters;
+    const caller = replacedFn.object;
+    const takeCall =
+      j.CallExpression.check(caller) &&
+      j.MemberExpression.check(caller.callee) &&
+      j.Identifier.check(caller.callee.property) &&
+      caller.callee.property.name === 'pipe' &&
+      caller.arguments.find(
+        (arg) =>
+          j.CallExpression.check(arg) &&
+          j.Identifier.check(arg.callee) &&
+          ((arg.callee.name === 'take' &&
+            j.NumericLiteral.check(arg.arguments[0]) &&
+            arg.arguments[0].value === 1) ||
+            arg.callee.name === 'first'),
+      );
+
+    let promiseFn = 'lastValueFrom';
+    if (takeCall) {
+      caller.arguments = caller.arguments.filter((arg) => arg !== takeCall);
+      promiseFn = 'firstValueFrom';
+    }
+
+    const observableExpression =
+      j.CallExpression.check(caller) &&
+      j.MemberExpression.check(caller.callee) &&
+      takeCall &&
+      !caller.arguments.length
+        ? caller.callee.object
+        : caller;
+
+    if (typeParams) {
+      importsAdded.add('Observable');
+    }
+
+    if (replacedFn.property.name === 'toPromise') {
       importsAdded.add(promiseFn);
-      const observableExpression =
-        j.CallExpression.check(caller) &&
-        j.MemberExpression.check(caller.callee) &&
-        takeCall &&
-        !caller.arguments.length
-          ? caller.callee.object
-          : caller;
-
-      if (typeParams) {
-        importsAdded.add('Observable');
-      }
 
       j(path).replaceWith(
         j.callExpression(j.identifier(promiseFn), [
@@ -69,7 +76,32 @@ export default function transform(
             : observableExpression,
         ]),
       );
-    });
+    } else if (
+      replacedFn.property.name === 'subscribe' &&
+      takeCall &&
+      path.value.arguments
+    ) {
+      importsAdded.add(promiseFn);
+
+      j(path).replaceWith(
+        j.callExpression(
+          j.memberExpression(
+            j.callExpression(j.identifier(promiseFn), [observableExpression]),
+            j.identifier('then'),
+          ),
+          path.value.arguments,
+        ),
+      );
+    }
+  };
+
+  root
+    .find(j.CallExpression, { callee: { property: { name: 'toPromise' } } })
+    .forEach(replaceWithFirstValueFrom);
+
+  root
+    .find(j.CallExpression, { callee: { property: { name: 'subscribe' } } })
+    .forEach(replaceWithFirstValueFrom);
 
   importsAdded.forEach((importName) => {
     const rxjsImport = root.find(j.ImportDeclaration, {

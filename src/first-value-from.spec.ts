@@ -208,7 +208,7 @@ const name = getUser().pipe(take(1), map(user => user.name)).toPromise();
 const results = await this.service.open().after().toPromise<Foo | null>();
       `),
     ).toMatchInlineSnapshot(`
-      "import { lastValueFrom, Observable } from "rxjs";
+      "import { Observable, lastValueFrom } from "rxjs";
       const results = await lastValueFrom(this.service.open().after() as Observable<Foo | null>);"
     `);
   });
@@ -221,7 +221,7 @@ import { getArgs } from "./args";
 const results = await this.service.open(getArgs()).after(take(1), first()).toPromise<Foo | null>();
       `),
     ).toMatchInlineSnapshot(`
-      "import { lastValueFrom, Observable } from "rxjs";
+      "import { Observable, lastValueFrom } from "rxjs";
       import { getArgs } from "./args";
 
       const results = await lastValueFrom(
@@ -238,7 +238,7 @@ import { take } from "rxjs/operators";
 const user = getUser().pipe(take(1)).toPromise<User>();
       `),
     ).toMatchInlineSnapshot(`
-      "import { firstValueFrom, Observable } from "rxjs";
+      "import { Observable, firstValueFrom } from "rxjs";
 
       const user = firstValueFrom(getUser() as Observable<User>);"
     `);
@@ -252,10 +252,90 @@ import { map, first } from "rxjs/operators";
 const name = getUser().pipe(map(user => user.name), first()).toPromise<"foo" | "bar">();
       `),
     ).toMatchInlineSnapshot(`
-      "import { firstValueFrom, Observable } from "rxjs";
+      "import { Observable, firstValueFrom } from "rxjs";
       import { map } from "rxjs/operators";
 
       const name = firstValueFrom(getUser().pipe(map(user => user.name)) as Observable<"foo" | "bar">);"
+    `);
+  });
+
+  it('handles subscriptions with first() and map() operators', () => {
+    expect(
+      t(`
+import { map, first } from "rxjs/operators";
+
+getUser().pipe(map(user => user.name), first()).subscribe(name => console.log(name));
+      `),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom } from "rxjs";
+      import { map } from "rxjs/operators";
+
+      firstValueFrom(getUser().pipe(map(user => user.name))).then(name => console.log(name));"
+    `);
+  });
+
+  it('handles subscriptions with take(1) and map() operators', () => {
+    expect(
+      t(`
+import { map, take } from "rxjs/operators";
+
+getUser().pipe(map(user => user.name), take(1)).subscribe((name) => { console.log(name); });
+      `),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom } from "rxjs";
+      import { map } from "rxjs/operators";
+
+      firstValueFrom(getUser().pipe(map(user => user.name))).then((name) => { console.log(name); });"
+    `);
+  });
+
+  it('does no remove subscriptions if they do not have take(1) or first()', () => {
+    expect(
+      t(`
+import { map, take } from "rxjs/operators";
+
+getUser().pipe(map(user => user.name)).subscribe((name) => { console.log(name); });
+      `),
+    ).toMatchInlineSnapshot(`
+      "import { map } from "rxjs/operators";
+
+      getUser().pipe(map(user => user.name)).subscribe((name) => { console.log(name); });"
+    `);
+  });
+
+  it('handles subscriptions with take(1) and an arrow function', () => {
+    expect(
+      t(`
+import { take } from "rxjs/operators";
+
+store.name$.pipe(take(1)).subscribe((x) => {
+  expect(x).toEqual("myname");
+});
+      `),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom } from "rxjs";
+
+      firstValueFrom(store.name$).then((x) => {
+        expect(x).toEqual("myname");
+      });"
+    `);
+  });
+
+  it('handles subscriptions with take(1) and an arrow function', () => {
+    expect(
+      t(`
+import { take } from "rxjs/operators";
+
+store.name$.pipe(take(1)).subscribe(function (x) {
+  expect(x).toEqual("foo");
+});
+      `),
+    ).toMatchInlineSnapshot(`
+      "import { firstValueFrom } from "rxjs";
+
+      firstValueFrom(store.name$).then(function (x) {
+        expect(x).toEqual("foo");
+      });"
     `);
   });
 });

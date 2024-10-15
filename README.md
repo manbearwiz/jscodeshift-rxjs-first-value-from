@@ -16,6 +16,7 @@ This codemod automates the migration from RxJS’s deprecated `.toPromise()` met
       - [`toPromise` to `firstValueFrom`](#topromise-to-firstvaluefrom)
       - [`toPromise` to `lastValueFrom`](#topromise-to-lastvaluefrom)
       - [`toPromise` with type argument](#topromise-with-type-argument)
+      - [`subscribe` to `firstValueFrom`](#subscribe-to-firstvaluefrom)
   - [Running Unit Tests](#running-unit-tests)
   - [Contributing](#contributing)
   - [License](#license)
@@ -111,6 +112,27 @@ import { lastValueFrom } from "rxjs";
 import { map } from "rxjs/operators";
 
 const name = lastValueFrom(getUser().pipe(map((user) => user.name)) as Observable<string>);
+```
+
+#### `subscribe` to `firstValueFrom`
+
+When calling `subscribe` on an observable with a single value, the codemod will replace it with `firstValueFrom`.
+
+Before:
+
+```ts
+import { map } from "rxjs/operators";
+
+getUser().pipe(map((user) => user.name), take(1)).subscribe((name) => console.log(name));
+```
+
+After running the codemod:
+
+```ts
+import { firstValueFrom } from "rxjs";
+import { map } from "rxjs/operators";
+
+firstValueFrom(getUser().pipe(map((user) => user.name))).then((name) => console.log(name));
 ```
 
 ## Running Unit Tests
