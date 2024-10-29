@@ -26,9 +26,9 @@ This codemod automates the migration from RxJS’s deprecated `.toPromise()` met
 To install the codemod, you can use `npm` or `yarn`.
 
 ```bash
-npm install --save-dev first-value-from-codemod
+npm install --save-dev jscodeshift-rxjs-first-value-from
 # or
-yarn add --dev first-value-from-codemod
+yarn add --dev jscodeshift-rxjs-first-value-from
 ```
 
 You'll also need [jscodeshift](https://github.com/facebook/jscodeshift), the framework that powers this codemod.
@@ -42,7 +42,7 @@ npm install -g jscodeshift
 To run the codemod, use the `jscodeshift` CLI and specify the path to the files you want to transform.
 
 ```bash
-jscodeshift -t ./node_modules/first-value-from-codemod/transform.js path/to/your/files
+jscodeshift -t ./node_modules/jscodeshift-rxjs-first-value-from/src/first-value-from.ts src
 ```
 
 ### Options
